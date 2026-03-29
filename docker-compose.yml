@@ -1,0 +1,25 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: thermomarket-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: Ascencio99
+      MYSQL_DATABASE: termos
+      MYSQL_USER: thermo_app
+      MYSQL_PASSWORD: ThermoApp99!
+    ports:
+      - "3307:3306"
+    volumes:
+      - thermomarket_mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pAscencio99"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  thermomarket_mysql_data:
