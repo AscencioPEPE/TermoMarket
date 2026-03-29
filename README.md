@@ -1,36 +1,32 @@
 # ThermoMarket API
 
-Backend de e-commerce construido con Spring Boot para una tienda de termos en Mexico.
+ThermoMarket API is a Spring Boot backend for a tumbler-focused e-commerce platform.
 
-Este proyecto esta enfocado a portafolio profesional y a la vez modela un flujo real de negocio:
+The system is designed around a practical catalog and order workflow:
 
-- catalogo de productos
-- clientes y direcciones
-- pedidos
-- inventario
-- imagenes de producto con S3
-- filtros y paginacion para frontend
+- product catalog with structured product attributes
+- customer and address management
+- order creation with product snapshot data
+- product image management backed by Amazon S3
+- cursor-based catalog navigation for frontend consumption
 
-## Demo Scope
+## Overview
 
-Actualmente el proyecto ya incluye:
+The current implementation covers the core backend foundation required for an online tumbler store:
 
-- API REST con Spring Boot 3
-- MySQL local con Docker
-- migraciones con Flyway
-- productos con atributos de catalogo real
-- seed data de termos demo
-- cursor pagination para catalogo
-- filtros por marca, categoria, color y capacidad
-- endpoint de opciones de filtro
-- gestion de imagenes de producto con metadata en BD
-- generacion de presigned URLs para subida a S3
-- relacion entre ordenes y snapshot de producto
+- product management
+- customer management
+- shipping address management
+- order creation
+- inventory-aware product selection
+- product image registration and storage integration
 
-## Stack
+The catalog is modeled with product-facing attributes that are useful for filtering and merchandising, including brand, category, color, material, capacity, and image metadata.
+
+## Tech Stack
 
 - Java 17
-- Spring Boot
+- Spring Boot 3
 - Spring Web
 - Spring Data JPA
 - Spring Security
@@ -41,85 +37,23 @@ Actualmente el proyecto ya incluye:
 - OpenAPI / Swagger
 - Maven
 
-## Why This Project Is Strong For Portfolio
-
-No es un CRUD generico.
-
-Este proyecto toca varias areas que suelen llamar la atencion en entrevistas:
-
-- modelado de dominio de e-commerce
-- arquitectura backend modular
-- persistencia relacional
-- migraciones versionadas
-- paginacion orientada a catalogo
-- integracion con almacenamiento cloud
-- separacion entre metadata e imagenes reales
-- base lista para integracion con frontend React
-
-## Business Context
-
-ThermoMarket API modela una tienda de termos donde los usuarios pueden:
-
-- consultar catalogo
-- filtrar productos
-- ver detalle de producto
-- crear clientes y direcciones
-- generar pedidos
-
-Desde administracion, el sistema esta preparado para:
-
-- gestionar catalogo
-- administrar imagenes de producto
-- enriquecer el inventario
-- evolucionar hacia checkout real y shipping
-
-## Current Modules
+## Core Features
 
 ### Catalog
 
-- productos
-- imagen principal por producto
-- imagenes secundarias
-- filtros dinamicos
-- cursor pagination
+- cursor-based pagination
+- text search
+- filters by:
+  - brand
+  - category
+  - color
+  - capacity
+- dynamic filter option endpoint
+- primary image resolution per product
 
-### Customers
+### Products
 
-- clientes
-- direcciones
-
-### Orders
-
-- creacion de pedidos
-- snapshot de producto al momento de compra
-- estados base de orden
-
-### Shared
-
-- excepciones
-- manejo global de errores
-- entidades base con auditoria
-
-### Storage
-
-- configuracion S3
-- presigned URLs
-
-## Project Structure
-
-```text
-src/main/java/com/ascencio/thermomarket
-├── catalog
-├── config
-├── customer
-├── order
-├── shared
-└── storage
-```
-
-## Product Model
-
-Los productos ya no son genericos. Actualmente incluyen:
+Each product currently includes:
 
 - `name`
 - `slug`
@@ -133,11 +67,42 @@ Los productos ya no son genericos. Actualmente incluyen:
 - `price`
 - `stock`
 - `active`
-- `primaryImageUrl`
 
-Esto permite que el frontend muestre un catalogo mucho mas realista desde el inicio.
+### Customers
 
-## API Highlights
+- customer registration
+- customer lookup
+- address registration
+- address listing per customer
+
+### Orders
+
+- create order from selected products
+- shipping address validation
+- product snapshot persistence on order items
+- stock validation during order creation
+
+### Product Images
+
+- generate presigned upload URLs for S3
+- register image metadata after upload
+- define primary image
+- reorder images
+- remove image metadata and object from S3
+
+## Project Structure
+
+```text
+src/main/java/com/ascencio/thermomarket
+├── catalog
+├── config
+├── customer
+├── order
+├── shared
+└── storage
+```
+
+## API Surface
 
 ### Products
 
@@ -170,9 +135,9 @@ Esto permite que el frontend muestre un catalogo mucho mas realista desde el ini
 - `GET /api/orders/{id}`
 - `POST /api/orders`
 
-## Catalog Query Features
+## Catalog Query Parameters
 
-El endpoint principal de catalogo soporta:
+`GET /api/products` supports the following query parameters:
 
 - `limit`
 - `cursor`
@@ -183,42 +148,59 @@ El endpoint principal de catalogo soporta:
 - `color`
 - `capacityOz`
 
-Ejemplos:
+Examples:
 
 ```http
 GET /api/products?limit=12
-GET /api/products?limit=12&search=negro
+GET /api/products?limit=12&search=black
 GET /api/products?limit=12&category=Termos
 GET /api/products?limit=12&brand=Rustic%20Thermal
 GET /api/products?limit=12&color=Negro
 GET /api/products?limit=12&capacityOz=30
 ```
 
+## Product Filter Options
+
+The catalog also exposes a dedicated endpoint for filter options:
+
+```http
+GET /api/products/filters
+```
+
+Example response:
+
+```json
+{
+  "brands": ["Rustic Thermal"],
+  "categories": ["Termos"],
+  "colors": ["Azul marino", "Blanco", "Negro"],
+  "capacitiesOz": [20, 30, 40]
+}
+```
+
 ## Product Image Flow
 
-Las imagenes no se guardan como blobs en MySQL.
+Product images are not stored in MySQL as blobs.
 
-El flujo implementado es:
+The current flow is:
 
-1. El frontend pide una URL firmada al backend.
-2. El backend genera un `storageKey` y una `uploadUrl`.
-3. El frontend sube el archivo directamente a S3.
-4. El backend registra la metadata en MySQL.
-5. El catalogo devuelve `primaryImageUrl` para mostrar la principal.
+1. The client requests a presigned upload URL from the backend.
+2. The backend generates a storage key and presigned S3 upload URL.
+3. The client uploads the image directly to S3.
+4. The backend stores image metadata in MySQL.
+5. The product response resolves the primary image URL for catalog usage.
 
-Esto hace que el sistema sea mucho mas escalable y limpio.
+This keeps binary storage separate from relational metadata and makes the image pipeline easier to evolve.
 
 ## Local Development
 
-### 1. Start MySQL With Docker
+### Start MySQL
 
 ```powershell
 docker compose up -d
 ```
 
-### 2. Set Environment Variables
-
-PowerShell:
+### Local Database Variables
 
 ```powershell
 $env:APP_PROFILE='local'
@@ -229,7 +211,7 @@ $env:DB_USERNAME='thermo_app'
 $env:DB_PASSWORD='ThermoApp99!'
 ```
 
-### 3. Optional S3 Variables For Local Image Upload Flow
+### Optional S3 Variables
 
 ```powershell
 $env:AWS_ACCESS_KEY_ID='YOUR_ACCESS_KEY_ID'
@@ -238,97 +220,69 @@ $env:S3_BUCKET_NAME='thermomarket-assets-dev'
 $env:S3_REGION='us-east-1'
 ```
 
-### 4. Run The API
+### Run the Application
 
 ```powershell
 mvn spring-boot:run
 ```
 
-### 5. Open Swagger
+### Swagger UI
 
 - `http://localhost:8080/swagger-ui.html`
 
-## Important Local Docs
-
-- [Local Dev Guide](c:/Users/pepej/Desktop/InventoryService/docs/local-dev-guide.md)
-- [Database Setup](c:/Users/pepej/Desktop/InventoryService/docs/database-setup.md)
-- [S3 Setup](c:/Users/pepej/Desktop/InventoryService/docs/s3-setup.md)
-- [Frontend AI Brief](c:/Users/pepej/Desktop/InventoryService/docs/frontend-ai-brief.md)
-- [Project Blueprint](c:/Users/pepej/Desktop/InventoryService/docs/portfolio-project-blueprint.md)
-
-## Sample Product Request
+## Sample Product Payload
 
 ```json
 {
-  "name": "Termo Negro Premium 40 oz",
-  "slug": "termo-negro-premium-40-oz",
-  "description": "Termo premium de 40 oz con asa lateral y mayor capacidad para trayectos largos.",
+  "name": "Black Premium Tumbler 40 oz",
+  "slug": "black-premium-tumbler-40-oz",
+  "description": "Premium 40 oz tumbler with side handle and extended thermal capacity.",
   "brand": "Rustic Thermal",
   "category": "Termos",
-  "color": "Negro",
-  "material": "Acero inoxidable 304",
+  "color": "Black",
+  "material": "304 stainless steel",
   "capacityOz": 40,
-  "imageAlt": "Termo Negro Premium 40 oz color negro",
+  "imageAlt": "Black Premium Tumbler 40 oz",
   "price": 429.00,
   "stock": 18,
   "active": true
 }
 ```
 
+## Product Images and Formats
+
+The image pipeline is intended for modern web delivery:
+
+- WebP is recommended as the primary catalog format
+- PNG can be used when source transparency is needed
+- metadata is stored in the application database
+- binary assets live in S3
+
+This setup keeps the backend ready for future additions such as thumbnails, transformed image variants, or CDN delivery through CloudFront.
+
 ## Security Notes
 
-- No guardar access keys de AWS dentro del repositorio.
-- En local usar variables de entorno.
-- En produccion usar IAM Role sobre EC2.
-- Mantener el bucket S3 sin acceso publico directo.
-- Usar presigned URLs para upload.
+- store AWS credentials in environment variables for local development
+- use IAM roles for production workloads on AWS
+- keep S3 buckets non-public by default
+- use presigned URLs for controlled upload flows
 
-## Roadmap
+## Seed Data
 
-### Short Term
+The project includes seed data for a sample tumbler catalog so the frontend can be integrated against realistic product data from the beginning.
 
-- integrar frontend React con el catalogo actual
-- agregar carrito
-- agregar checkout
-- incluir seed de clientes demo
+## Reference Docs
 
-### Medium Term
+- [Local Dev Guide](c:/Users/pepej/Desktop/InventoryService/docs/local-dev-guide.md)
+- [Database Setup](c:/Users/pepej/Desktop/InventoryService/docs/database-setup.md)
+- [S3 Setup](c:/Users/pepej/Desktop/InventoryService/docs/s3-setup.md)
+- [Frontend AI Brief](c:/Users/pepej/Desktop/InventoryService/docs/frontend-ai-brief.md)
 
-- JWT y roles
-- tracking de orden
-- shipping
-- validaciones de stock mas finas
-- tests de integracion
+## Next Areas of Expansion
 
-### Future
-
-- CloudFront para servir imagenes
-- order lifecycle mas completo
-- panel admin
-- analytics de ventas
-
-## Frontend Direction
-
-El frontend companion recomendado para este backend es:
-
-- React
-- Vite
-- TypeScript
-- React Router
-- TanStack Query
-- Zustand
-
-El contrato backend ya esta pensado para ese flujo.
-
-## Portfolio Pitch
-
-`ThermoMarket API es un backend de e-commerce con Spring Boot para venta de termos, con catalogo paginado y filtrable, pedidos, clientes, MySQL con Docker, migraciones Flyway y gestion de imagenes en AWS S3 mediante presigned URLs.`
-
-## Status
-
-Proyecto en construccion activa, pero con base funcional real para:
-
-- backend local reproducible
-- integracion con frontend
-- demo tecnica en portafolio
+- shopping cart
+- checkout flow
+- JWT authentication and roles
+- shipment lifecycle
+- analytics and admin workflows
 
